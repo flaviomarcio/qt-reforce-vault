@@ -7,8 +7,8 @@ LC_ALL=en_US.UTF-8
 
 include($$PWD/../qt-reforce-vault.pri)
 
-Q_STM_TEST=true
-QMAKE_CXXFLAGS += -DQ_STM_TEST=\\\"$$Q_STM_TEST\\\"
+Q_VAULT_TEST=true
+QMAKE_CXXFLAGS += -DQ_VAULT_TEST=\\\"$$Q_VAULT_TEST\\\"
 
 INCLUDEPATH+=$$PWD/src
 
