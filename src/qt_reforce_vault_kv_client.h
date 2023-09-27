@@ -5,15 +5,6 @@
 #include <QVariantHash>
 #include "./qt_reforce_vault_global.h"
 #include "./qt_reforce_vault_setting.h"
-/*
-curl --header "X-Vault-Token: 00000000-0000-0000-0000-000000000000" http://development-transul-vault/v1/secret/data/app
-
-curl \
-  --header "X-Vault-Token: 00000000-0000-0000-0000-000000000000" \
-  --request POST \
-  --data '{"data": {"a": "bbbbb", "c": "dddddd"}}' \
-  http://development-transul-vault/v1/secret/data/app
-*/
 
 namespace QtReforce {
 class KvClientPvt;
