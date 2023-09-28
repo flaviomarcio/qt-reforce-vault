@@ -3,7 +3,7 @@
 #include <QMetaEnum>
 #include <QCoreApplication>
 
-namespace QtReforce{
+namespace QVault{
 
 static const auto __vault_v1="v1";
 

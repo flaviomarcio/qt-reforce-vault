@@ -6,7 +6,7 @@
 #include "./qt_reforce_vault_global.h"
 #include "./qt_reforce_vault_setting.h"
 
-namespace QtReforce {
+namespace QVault {
 class KvClientPvt;
 
 //!

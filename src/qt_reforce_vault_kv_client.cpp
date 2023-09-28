@@ -13,7 +13,7 @@
 //  https://developer.hashicorp.com/vault/tutorials/getting-started/getting-started-apis
 //  https://developer.hashicorp.com/vault/tutorials/getting-started/getting-started-authentication
 
-namespace QtReforce{
+namespace QVault{
 
 static const auto __data="data";
 static const auto __splitEnv="=";

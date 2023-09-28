@@ -5,7 +5,7 @@
 #include <QVariant>
 #include "./qt_reforce_vault_global.h"
 
-namespace QtReforce {
+namespace QVault {
 class SettingPvt;
 
 //!
