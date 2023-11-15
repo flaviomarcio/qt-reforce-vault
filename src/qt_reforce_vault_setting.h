@@ -3,10 +3,12 @@
 #include <QObject>
 #include <QUrl>
 #include <QVariant>
+#include <QUrl>
 #include "./qt_reforce_vault_global.h"
 
-namespace QVault {
+namespace QtVault {
 class SettingPvt;
+class KvClient;
 
 //!
 //! \brief The Setting class
@@ -14,79 +16,118 @@ class SettingPvt;
 class Q_REFORCE_VAULT_EXPORT Setting: public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(Method method READ method WRITE method RESET resetMethod NOTIFY methodChanged FINAL)
+    Q_PROPERTY(QVariant method READ method WRITE method RESET resetMethod NOTIFY methodChanged FINAL)
     Q_PROPERTY(QVariant url READ url WRITE url RESET resetUrl NOTIFY urlChanged FINAL)
-    Q_PROPERTY(QString version READ version WRITE version RESET resetVersion NOTIFY versionChanged FINAL)
-    Q_PROPERTY(QString token READ token WRITE token RESET resetToken NOTIFY tokenChanged FINAL)
-    Q_PROPERTY(QString roleId READ roleId WRITE roleId RESET resetRoleId NOTIFY roleIdChanged FINAL)
-    Q_PROPERTY(QString secretId READ secretId WRITE secretId RESET resetSecretId NOTIFY secretIdChanged FINAL)
-    Q_PROPERTY(QString import READ import WRITE import RESET resetImport NOTIFY importChanged FINAL)
+    Q_PROPERTY(QVariant version READ version WRITE version RESET resetVersion NOTIFY versionChanged FINAL)
+    Q_PROPERTY(QVariant token READ token WRITE token RESET resetToken NOTIFY tokenChanged FINAL)
+    Q_PROPERTY(QVariant roleId READ roleId WRITE roleId RESET resetRoleId NOTIFY roleIdChanged FINAL)
+    Q_PROPERTY(QVariant secretId READ secretId WRITE secretId RESET resetSecretId NOTIFY secretIdChanged FINAL)
+    Q_PROPERTY(QVariant secretsPath READ secretsPath WRITE secretsPath RESET resetSecretsPath NOTIFY secretsPathChanged FINAL)
+    Q_PROPERTY(QVariant secretsName READ secretsName WRITE secretsName RESET resetSecretsName NOTIFY secretsNameChanged FINAL)
+    Q_PROPERTY(QVariant secretsRevision READ secretsRevision WRITE secretsRevision RESET resetSecretsRevision NOTIFY secretsRevisionChanged FINAL)
 public:
     enum Method{
         Token, RoleId
     };
     Q_ENUM(Method)
+
     //!
     //! \brief Setting
     //! \param parent
     //!
     Q_INVOKABLE explicit Setting(QObject *parent=nullptr);
+    explicit Setting(const QVariant &values, QObject *parent=nullptr);
 
     //!
-    //! \brief method
+    //! \brief kv
     //! \return
     //!
-    Method method() const;
-    Setting &method(const Method &newMethod);
-    Setting &resetMethod();
+    KvClient *kv();
 
     //!
-    //! \brief version
+    //! \brief clear
     //! \return
     //!
-    const QString &version() const;
-    Setting &version(const QString &newVersion);
-    Setting &resetVersion();
+    Setting &clear();
 
     //!
-    //! \brief token
+    //! \brief setValues
+    //! \param newValues
     //! \return
     //!
-    const QString &token() const;
-    Setting &token(const QString &newToken);
-    Setting &resetToken();
-
-    //!
-    //! \brief roleId
-    //! \return
-    //!
-    const QString &roleId() const;
-    Setting &roleId(const QString &newRoleId);
-    Setting &resetRoleId();
-
-    //!
-    //! \brief secretId
-    //! \return
-    //!
-    const QString &secretId() const;
-    Setting &secretId(const QString &SecretId);
-    Setting &resetSecretId();
+    Setting &setValues(const QVariant &newValues);
 
     //!
     //! \brief url
     //! \return
     //!
     const QUrl &url() const;
-    Setting &url(const QVariant &newUrl);
+    Setting &url(const QVariant &newValues);
     Setting &resetUrl();
 
     //!
-    //! \brief import
+    //! \brief method
     //! \return
     //!
-    const QString &import() const;
-    Setting &import(const QString &newImport);
-    Setting &resetImport();
+    Method method() const;
+    Setting &method(const QVariant &newValues);
+    Setting &resetMethod();
+
+    //!
+    //! \brief version
+    //! \return
+    //!
+    const QByteArray &version() const;
+    Setting &version(const QVariant &newValues);
+    Setting &resetVersion();
+
+    //!
+    //! \brief token
+    //! \return
+    //!
+    const QByteArray &token() const;
+    Setting &token(const QVariant &newValues);
+    Setting &resetToken();
+
+    //!
+    //! \brief roleId
+    //! \return
+    //!
+    const QByteArray &roleId() const;
+    Setting &roleId(const QVariant &newValues);
+    Setting &resetRoleId();
+
+    //!
+    //! \brief secretId
+    //! \return
+    //!
+    const QByteArray &secretId() const;
+    Setting &secretId(const QVariant &newValues);
+    Setting &resetSecretId();
+
+    //!
+    //! \brief secretPath
+    //! \return
+    //!
+    const QUrl &secretsPath() const;
+    Setting &secretsPath(const QVariant &newValues);
+    Setting &resetSecretsPath();
+
+    //!
+    //! \brief secretsName
+    //! \return
+    //!
+    const QByteArray &secretsName() const;
+    Setting &secretsName(const QVariant &newValues);
+    Setting &resetSecretsName();
+
+    //!
+    //! \brief secretsRevision
+    //! \return
+    //!
+    int secretsRevision() const;
+    Setting &secretsRevision(const QVariant &newValues);
+    Setting &resetSecretsRevision();
 
 
 private:
@@ -98,13 +139,15 @@ private:
 
 signals:
 
+    void urlChanged();
     void methodChanged();
     void versionChanged();
     void tokenChanged();
     void roleIdChanged();
     void secretIdChanged();
-    void urlChanged();
-    void importChanged();
+    void secretsPathChanged();
+    void secretsNameChanged();
+    void secretsRevisionChanged();
 };
 
 }

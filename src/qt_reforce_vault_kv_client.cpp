@@ -1,7 +1,9 @@
 #include "./qt_reforce_vault_kv_client.h"
 #include "./qt_reforce_vault_setting.h"
 #include "./private/p_qt_reforce_vault_request_util.h"
+#include "./private/p_qt_reforce_vault_utils.h"
 #include "./private/p_qt_reforce_vault_logs.h"
+#include <QFile>
 #include <QProcess>
 #include <QDebug>
 #include <QCoreApplication>
@@ -13,8 +15,10 @@
 //  https://developer.hashicorp.com/vault/tutorials/getting-started/getting-started-apis
 //  https://developer.hashicorp.com/vault/tutorials/getting-started/getting-started-authentication
 
-namespace QVault{
+namespace QtVault{
 
+static const auto __auth="auth";
+static const auto __client_token="client_token";
 static const auto __data="data";
 static const auto __splitEnv="=";
 static const auto __X_Vault_Token="X-Vault-Token";
@@ -58,25 +62,49 @@ class KvClientPvt:public QObject
 public:
     KvClient *parent;
     Setting setting;
+    QByteArray currentToken;
     KvClient::VoidKvMethod onStarted=nullptr;
     KvClient::VoidMapMethod onLoaded=nullptr;
     KvClient::VoidMapMethod onFail=nullptr;
     KvClient::VoidKvMethod onFinished=nullptr;
 
     QVariantHash envOriginal;
-    QVariantHash envLoaded;
+    QVariantHash data;
     QVariantHash vaultMetaData;
+    bool isAuthenticated=false;
     bool isLoading=false;
+    bool isLoaded=false;
+    bool isSuccessful=false;
 
     explicit KvClientPvt(KvClient *parent):QObject{parent},parent{parent},setting{parent}
     {
     }
 
-    QUrl makeToLogin()
+    explicit KvClientPvt(const QVariant &values, KvClient *parent):QObject{parent},parent{parent},setting{values, parent}
+    {
+    }
+
+    void clear()
+    {
+        this->vaultMetaData.clear();
+        this->isAuthenticated=false;
+        this->clean();
+    }
+
+    void clean()
+    {
+        this->data.clear();
+        this->vaultMetaData.clear();
+        this->isLoading=false;
+        this->isLoaded=false;
+        this->isSuccessful=false;
+    }
+
+    QUrl makeUrlVaultLogin()
     {
         auto url=this->setting.url().toString();
         auto version=this->setting.version().trimmed().toLower();
-        auto import=this->setting.import().trimmed();
+        auto import=this->setting.secretsName().trimmed();
         import=import.isEmpty()?"":("/"+import);
 
         static const auto __format=QString("%1/%2/auth/approle/login");
@@ -84,11 +112,11 @@ public:
         return QUrl(url);
     }
 
-    QUrl makeToGetSet()
+    QUrl makeUrlVaultData()
     {
         auto url=this->setting.url().toString();
         auto version=this->setting.version().trimmed().toLower();
-        auto import=this->setting.import().trimmed();
+        auto import=this->setting.secretsName().trimmed();
         import=import.isEmpty()?"":("/"+import);
 
         static const auto __format=QString("%1/%2/secret/data%3");
@@ -96,96 +124,81 @@ public:
         return QUrl(url);
     }
 
-    auto makeRequest()
+    void emitFail(const QVariantHash &error)
     {
-        return &RequestUtil::builder()
-            .onStarted([](){})
-            .onFail(
-                [this](RequestUtil::Response response)
-                {
-                    this->isLoading=false;
-                    auto error=response.toMap();
-                    if(this->onFail)
-                        this->onFail(error);
-                    emit this->parent->fail(error);
-                }
-                )
-            .onFinished(
-                [this](RequestUtil *r)
-                {
-                    r->deleteLater();
-                    this->isLoading=false;
-                    if(this->onFinished)
-                        this->onFinished(*this->parent);
-                });
+        if(this->onFail)
+            this->onFail(error);
+        emit this->parent->fail(error);
+        if(this->onFinished)
+            this->onFinished(*this->parent);
+        this->isSuccessful=false;
     }
 
+    auto makeRequest()
+    {
+        this->isLoading=true;
+        return &RequestUtil::builder()
+                    .onStarted([](){})
+                    .onFail(
+                        [this](RequestUtil::Response response)
+                        {
+                            emitFail(response.toMap());
+                        }
+                        )
+                    .onFinished(
+                        [this](RequestUtil *r)
+                        {
+                            r->deleteLater();
+                            this->isLoading=false;
+                            if(this->onFinished)
+                                this->onFinished(*this->parent);
+                            this->isLoading=false;
+                        })
+                    .headers(__X_Vault_Token, this->currentToken);
+    }
 
     void auth(RequestUtil::VoidMethod callbackSuccess)
     {
-        if(this->setting.method()==Setting::Token){
+        this->clean();
+
+        if(this->isAuthenticated){
             callbackSuccess();
             return;
         }
 
-        if(this->setting.method()==Setting::RoleId){
-            /*
-request
-curl --request POST \
-       --data '{"role_id": "3c301960-8a02-d776-f025-c3443d513a18", "secret_id": "22d1e0d6-a70b-f91f-f918-a0ee8902666b"}' \
-       http://127.0.0.1:8200/v1/auth/approle/login | jq -r ".auth"
-
-response
-{
-  "auth": {
-    "renewable": true,
-    "lease_duration": 2764800,
-    "metadata": {},
-    "policies": ["default", "dev-policy", "test-policy"],
-    "accessor": "5d7fb475-07cb-4060-c2de-1ca3fcbf0c56",
-    "client_token": "98a4c7ab-b1fe-361b-ba0b-e307aacfd587"
-  }
-}
-*/
-            auto &req=*makeRequest();
-            req
-                .onSuccessful(
-                    [this, &callbackSuccess](RequestUtil::Response response)
-                    {
-                        static const auto __auth="auth";
-                        static const auto __client_token="client_token";
-                        auto map=response.bodyAsMap();
-                        auto token=map.value(__auth).toHash().value(__client_token).toString();
-                        this->setting.token(token);
-                        callbackSuccess();
-                    })
-                .onFail(
-                    [this](RequestUtil::Response response)
-                    {
-                        auto error=response.toMap();
-                        if(this->onFail)
-                            this->onFail(error);
-                        emit this->parent->fail(error);
-                        if(this->onFinished)
-                            this->onFinished(*this->parent);
-                        this->isLoading=true;
-                    }
-                    )
-                .onFinished([](RequestUtil *r){r->deleteLater();})
-                .POST()
-                .headers(__X_Vault_Token, this->setting.token())
-                .url(this->makeToLogin())
-                .body(QVariantHash{{__role_id, this->setting.roleId()},{__secret_id, this->setting.secretId()}})
-                .call();
+        if(!this->setting.token().isEmpty()){
+            this->isAuthenticated=true;
+            this->currentToken=this->setting.token();
+            callbackSuccess();
             return;
         }
 
-
+        auto &req=*makeRequest();
+        req
+            .onSuccessful(
+                [this, &callbackSuccess](RequestUtil::Response response)
+                {
+                    auto map=response.bodyAsMap();
+                    this->currentToken=map.value(__auth).toHash().value(__client_token).toByteArray().trimmed();
+                    if(this->currentToken.isEmpty()){
+                        emitFail({{"error","Invalid token, no token found"}});
+                    }
+                    else{
+                        this->isSuccessful=true;
+                        callbackSuccess();
+                    }
+                })
+            .POST()
+            .headers({})
+            .url(this->makeUrlVaultLogin())
+            .body(QVariantHash{{__role_id, this->setting.roleId()},{__secret_id, this->setting.secretId()}})
+            .call();
+        return;
     }
 
-    void load()
+    void pull()
     {
-        this->isLoading=true;
+        this->clean();
         this->auth(
             [this]()
             {
@@ -194,50 +207,22 @@ response
                     .onSuccessful(
                         [this](RequestUtil::Response response)
                         {
-                            this->envsSet(response.bodyAsMap());
+                            this->setValues(response.bodyAsMap());
                             if(this->onLoaded)
-                                this->onLoaded(this->envLoaded);
-                            emit this->parent->loaded(this->envLoaded);
+                                this->onLoaded(this->data);
+                            emit this->parent->loaded(this->data);
+                            this->isSuccessful=true;
                         })
                     .GET()
                     .headers(__X_Vault_Token, this->setting.token())
-                    .url(this->makeToGetSet())
+                    .url(this->makeUrlVaultData())
                     .call();
             });
-/*
-curl \
-    -H "X-Vault-Token: 00000000-0000-0000-0000-000000000000" \
-    -X GET \
-    http://127.0.0.1:8200/v1/secret/data/app
-
-{
-  "request_id": "40389033-5626-be19-cd05-cebb963bbd46",
-  "lease_id": "",
-  "renewable": false,
-  "lease_duration": 0,
-  "data": {
-    "data": {
-      "a": "bbbbb",
-      "c": "dddddd"
-    },
-    "metadata": {
-      "created_time": "2023-09-27T04:45:10.018536565Z",
-      "custom_metadata": null,
-      "deletion_time": "",
-      "destroyed": false,
-      "version": 9
-    }
-  },
-  "wrap_info": null,
-  "warnings": null,
-  "auth": null
-}
-
-*/
     }
 
-    void update()
+    void push()
     {
+        this->clean();
         this->isLoading=true;
         this->auth(
             [this]()
@@ -248,34 +233,29 @@ curl \
                         [this](RequestUtil::Response response)
                         {
                             this->vaultMetaData=response.bodyAsMap();
+                            this->isSuccessful=true;
                         })
                     .POST()
                     .headers(__X_Vault_Token, this->setting.token())
-                    .url(this->makeToGetSet())
-                    .body(this->envLoaded)
+                    .url(this->makeUrlVaultData())
+                    .body(this->data)
                     .call();
             });
-/*
-curl \
-    --header "X-Vault-Token: 00000000-0000-0000-0000-000000000000" \
-    --request POST \
-    --data '{ "data": {"password": "my-long-password"} }' \
-    http://127.0.0.1:8200/v1/secret/data/app | jq -r ".data"
-
-{
-  "created_time": "2020-02-05T16:51:34.0887877Z",
-  "deletion_time": "",
-  "destroyed": false,
-  "version": 1
-}
-
-*/
     }
 
-    void envsUnSet()
+    void addValues(const QVariant &data)
+    {
+        setData(data,false);
+    }
+
+    void setValues(const QVariant &data)
+    {
+        setData(data,true);
+    }
+
+    void systemEnvironmentUnSet()
     {
         auto envCurrent=makeEnvs();
-
         //unset envs
         QHashIterator<QString, QVariant> i(envCurrent);
         while (i.hasNext()){
@@ -290,14 +270,14 @@ curl \
         }
     }
 
-    void envsSet(const QVariantHash &envs)
+    void systemEnvironmentSet()
     {
-        if(!this->vaultMetaData.isEmpty())
-            this->envsUnSet();
-        this->vaultMetaData=envs;
-        this->envLoaded=envs.value(__data).toHash().value(__data).toHash();
+        this->systemEnvironmentSet(this->data);
+    }
 
-        QHashIterator<QString, QVariant> i(this->envLoaded);
+    static void systemEnvironmentSet(const QVariantHash &data)
+    {
+        QHashIterator<QString, QVariant> i(data);
         while (i.hasNext()){
             i.next();
             auto key=i.key().toUtf8();
@@ -306,40 +286,113 @@ curl \
             if(!qputenv(key, value))
                 sWarning()<<QStringLiteral("Fail on qputenv(%1, %2)").arg(key, value);
         }
-        envsUnSet();
+    }
+    void rm(const QVariantList &keys)
+    {
+        for(auto&v:keys){
+            auto key=v.toString().trimmed().toLower();
+            this->data.remove(key);
+        }
+    }
+    const QVariant get(const QString &key) const
+    {
+        auto keyName=key.trimmed();
+        if(keyName.isEmpty())
+            return {};
+
+        if(this->data.contains(key))
+            return this->data.value(key).toString();
+
+        keyName=keyName.toLower();
+        QHashIterator<QString,QVariant> i(this->data);
+        while(i.hasNext()){
+            i.next();
+            auto k=i.key().trimmed();
+            if(keyName==k)
+                return this->data.value(keyName).toString();
+        }
+
+        return {};
     }
 
+    const QVariantHash get(const QVariant &keys) const
+    {
+        if(keys.isNull() || !keys.isValid())
+            return {};
+
+        QStringList keyNames;
+        switch (keys.typeId()) {
+        case QMetaType::QVariantList:
+        case QMetaType::QStringList:
+        {
+            auto vList=keys.toList();
+            for(auto&v: vList)
+                keyNames.append(v.toString().trimmed());
+            break;
+        }
+        case QMetaType::QVariantHash:
+        case QMetaType::QVariantMap:
+        case QMetaType::QVariantPair:
+        {
+            auto vList=keys.toHash().keys();
+            for(auto&v: vList)
+                keyNames.append(v.trimmed());
+            break;
+        }
+        default:
+            keyNames.append(keys.toString().trimmed());
+            break;
+        }
+        QVariantHash __values;
+        for(auto&key:keyNames){
+            auto value=get(key);
+            if(!value.isNull() && value.isValid())
+                __values.insert(key,value);
+        }
+
+        return __values;
+    }
+private:
+    void setData(const QVariant &data, bool replaceAll)
+    {
+        if(replaceAll){
+            if(!this->vaultMetaData.isEmpty())
+                this->systemEnvironmentUnSet();
+            this->clear();
+        }
+
+        if(data.isNull() || !data.isValid())
+            return;
+
+        QVariantHash environments=Utils::toHash(data);
+        if(environments.contains(__data)){
+            auto vHash=environments.value(__data).toHash();
+            if(vHash.contains(__data)){
+                if(replaceAll)
+                    this->vaultMetaData=data.toHash();
+                environments=vHash.value(__data).toHash();
+                this->isLoaded=true;
+            }
+        }
+
+        QHashIterator<QString,QVariant> i(environments);
+        while(i.hasNext()){
+            i.next();
+            auto k=i.key().trimmed();
+            if(!k.isEmpty()){
+                const auto &v=i.value();
+                this->data.insert(k, v);
+            }
+        }
+    }
 };
 
 KvClient::KvClient(QObject *parent):QObject{parent},p{new KvClientPvt{this}}
 {
 }
 
-const QVariantHash &KvClient::values() const
+KvClient::KvClient(const QVariant &settings, QObject *parent):QObject{parent},p{new KvClientPvt{settings, this}}
 {
-    return p->envLoaded;
-}
-
-const KvClient &KvClient::values(const QVariantHash &newValues) const
-{
-    p->envLoaded=newValues;
-    return *this;
-}
-
-const KvClient &KvClient::values(const QString &key, const QString &value) const
-{
-    p->envLoaded.insert(key,value);
-    return *this;
-}
-
-const QString KvClient::value(const QString &key) const
-{
-    return p->envLoaded.value(key).toString();
-}
-
-bool KvClient::isLoading()
-{
-    return p->isLoading;
 }
 
 Setting &KvClient::setting()
@@ -347,43 +400,201 @@ Setting &KvClient::setting()
     return p->setting;
 }
 
-KvClient &KvClient::load()
+const KvClient &KvClient::setting(const QVariant &newValues) const
 {
-    p->load();
+    p->setting.setValues(newValues);
     return *this;
 }
 
-KvClient &KvClient::update()
+const KvClient &KvClient::clear() const
 {
-    p->update();
+    p->clear();
     return *this;
 }
 
-KvClient &KvClient::revert()
+const KvClient &KvClient::clean() const
 {
-    p->envsUnSet();
+    p->clean();
     return *this;
 }
 
-KvClient &KvClient::onStarted(VoidKvMethod method)
+const KvClient &KvClient::values(const QString &newValues)const
+{
+    p->setValues(newValues);
+    return *this;
+}
+
+const KvClient &KvClient::values(const QVariantHash &newValues)const
+{
+    p->setValues(newValues);
+    return *this;
+}
+
+const KvClient &KvClient::values(const QVariantMap &newValues)const
+{
+    p->setValues(newValues);
+    return *this;
+}
+
+const KvClient &KvClient::values(const VariantPair &newValues)const
+{
+    p->setValues(QVariantHash{{newValues.first, newValues.second}});
+    return *this;
+}
+
+const KvClient &KvClient::values(const QString &key, const QString &value)const
+{
+    p->setValues(QVariantHash{{key, value}});
+    return *this;
+}
+
+const KvClient &KvClient::put(const QString &newValues) const
+{
+    p->addValues(newValues);
+    return *this;
+}
+
+const KvClient &KvClient::put(const QVariantHash &newValues) const
+{
+    p->addValues(newValues);
+    return *this;
+}
+
+const KvClient &KvClient::put(const VariantPair &newValues) const
+{
+    p->addValues(QVariantHash{{newValues.first,newValues.second}});
+    return *this;
+}
+
+const KvClient &KvClient::put(const QString &key, const QString &value) const
+{
+    p->addValues(QVariantHash{{key,value}});
+    return *this;
+}
+
+const KvClient &KvClient::rm(const QString &key) const
+{
+    p->rm({key});
+    return *this;
+}
+
+const KvClient &KvClient::rm(const QVariantHash &keys) const
+{
+    p->rm({keys.keys()});
+    return *this;
+}
+
+const KvClient &KvClient::rm(const QVariantMap &keys) const
+{
+    p->rm({keys.keys()});
+    return *this;
+}
+
+const KvClient &KvClient::rm(const QVariantList &keys) const
+{
+    p->rm(keys);
+    return *this;
+}
+
+const KvClient &KvClient::rm(const QStringList &keys) const
+{
+    p->rm(QVariantList{keys});
+    return *this;
+}
+
+const QVariantHash &KvClient::get() const
+{
+    return p->data;
+}
+
+const QString KvClient::get(const QString &key) const
+{
+    return p->get(key).toString();
+}
+
+const QVariantHash KvClient::get(const QVariantList &keys) const
+{
+    return p->get(keys);
+}
+
+const QVariantHash KvClient::get(const QStringList &keys) const
+{
+    return p->get(keys);
+}
+
+const QVariantHash KvClient::get(const QVariantHash &keys) const
+{
+    return p->get(keys);
+}
+
+const QVariantHash KvClient::get(const QVariantMap &keys) const
+{
+    return p->get(keys);
+}
+
+bool KvClient::isLoading() const
+{
+    return p->isLoading;
+}
+
+bool KvClient::isLoaded() const
+{
+    return p->isLoaded;
+}
+
+bool KvClient::isSuccessful() const
+{
+    return p->isSuccessful;
+}
+
+bool KvClient::isAuthenticated() const
+{
+    return p->isAuthenticated;
+}
+
+const KvClient &KvClient::pull() const
+{
+    p->pull();
+    return *this;
+}
+
+const KvClient &KvClient::push() const
+{
+    p->push();
+    return *this;
+}
+
+const KvClient &KvClient::systemEnvironmentSet() const
+{
+    p->systemEnvironmentSet();
+    return *this;
+}
+
+const KvClient &KvClient::systemEnvironmentUnSet() const
+{
+    p->systemEnvironmentUnSet();
+    return *this;
+}
+
+const KvClient &KvClient::onStarted(VoidKvMethod method) const
 {
     p->onStarted=method;
     return *this;
 }
 
-KvClient &KvClient::onLoaded(VoidMapMethod method)
+const KvClient &KvClient::onLoaded(VoidMapMethod method) const
 {
     p->onLoaded=method;
     return *this;
 }
 
-KvClient &KvClient::onFail(VoidMapMethod method)
+const KvClient &KvClient::onFail(VoidMapMethod method) const
 {
     p->onFail=method;
     return *this;
 }
 
-KvClient &KvClient::onFinished(VoidKvMethod method)
+const KvClient &KvClient::onFinished(VoidKvMethod method) const
 {
     p->onFinished=method;
     return *this;

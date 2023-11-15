@@ -6,7 +6,7 @@
 #include <QNetworkRequest>
 #include <QMetaEnum>
 
-namespace QVault{
+namespace QtVault{
 
 static const auto __list="list";
 static const auto __statusCode="__statusCode";

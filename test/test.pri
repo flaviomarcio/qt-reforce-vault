@@ -5,7 +5,7 @@ QT += testlib
 
 LC_ALL=en_US.UTF-8
 
-include($$PWD/../qt-reforce-vault.pri)
+include($$PWD/../qtvault.pri)
 
 Q_VAULT_TEST=true
 QMAKE_CXXFLAGS += -DQ_VAULT_TEST=\\\"$$Q_VAULT_TEST\\\"

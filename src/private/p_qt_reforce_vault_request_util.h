@@ -8,7 +8,7 @@
 #include <QStringList>
 #include "../qt_reforce_vault_global.h"
 
-namespace QVault {
+namespace QtVault {
 class RequestUtilPvt;
 
 //!

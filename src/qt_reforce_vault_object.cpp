@@ -1,6 +1,6 @@
 #include "./qt_reforce_vault_object.h"
 
-namespace QVault{
+namespace QtVault{
 
 
 class ObjectPvt:public QObject
