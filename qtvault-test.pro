@@ -7,7 +7,7 @@ CONFIG -= debug_and_release
 QT -= gui
 
 TEMPLATE = app
-TARGET = QtReforceVaultTest
+TARGET = QtVaultTests
 
 INCLUDEPATH+=$$PWD/../src
 #INCLUDEPATH+=$$PWD/../src/private
