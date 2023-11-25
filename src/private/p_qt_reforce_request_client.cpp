@@ -1,4 +1,4 @@
-#include "./p_qt_reforce_vault_request_util.h"
+#include "./p_qt_reforce_request_client.h"
 #include <QJsonDocument>
 #include <QNetworkAccessManager>
 #include <QScopedPointerDeleteLater>
@@ -9,7 +9,7 @@
 #include <QDebug>
 #include <QVariant>
 
-namespace QtVault{
+namespace QtReforce{
 
 static const auto __list="list";
 static const auto __statusCode="__statusCode";
@@ -24,11 +24,11 @@ public:
     int statusCode;
     QByteArray reasonPhrase;
     QByteArray body;
-    RequestUtil::VoidMethod onStarted=nullptr;
-    RequestUtil::VoidMethod onSent=nullptr;
-    RequestUtil::ResponseMethod onSuccessful=nullptr;
-    RequestUtil::ResponseMethod onFail=nullptr;
-    RequestUtil::RequestMethod onFinished=nullptr;
+    RequestClient::VoidMethod onStarted=nullptr;
+    RequestClient::VoidMethod onSent=nullptr;
+    RequestClient::ResponseMethod onSuccessful=nullptr;
+    RequestClient::ResponseMethod onFail=nullptr;
+    RequestClient::RequestMethod onFinished=nullptr;
     bool isRunning=false;
 
     explicit ResponsePvt(){}
@@ -52,29 +52,29 @@ public:
 class RequestClientPvt:public QObject
 {
 public:
-    RequestUtil *parent;
+    RequestClient *parent;
     bool aSync=false;
     bool printOnFail=false;
-    RequestUtil::Method method=RequestUtil::Get;
+    RequestClient::Method method=RequestClient::Get;
     QUrl url;
     QVariantHash headers, args;
     QByteArray body;
     ResponsePvt response;
     QNetworkAccessManager qnam;
     QScopedPointer<QNetworkReply, QScopedPointerDeleteLater> replyScope;
-    explicit RequestClientPvt(RequestUtil *parent):QObject{parent},parent{parent}{
+    explicit RequestClientPvt(RequestClient *parent):QObject{parent},parent{parent}{
 
     }
 
     void print() {
-        auto e=QMetaEnum::fromType<RequestUtil::Method>();
-        auto method=(this->method==RequestUtil::Method::Upload)
-                          ?RequestUtil::Method::Post
+        auto e=QMetaEnum::fromType<RequestClient::Method>();
+        auto method=(this->method==RequestClient::Method::Upload)
+            ?RequestClient::Method::Post
                           :this->method;
         auto methodName=QByteArray(e.valueToKey(method)).toUpper();
         QStringList str;
         str.append(QString("curl -i -X %1").arg(methodName));
-        if(this->method==RequestUtil::Upload)
+        if(this->method==RequestClient::Upload)
             str.append(QString("-F \"file=@%1\"").arg(this->body));
 
         str.append(QString("--location \"%1\"").arg(this->url.toString()));
@@ -94,8 +94,8 @@ public:
         }
         if(!this->body.isEmpty()){
             switch (this->method) {
-            case RequestUtil::Post:
-            case RequestUtil::Put:
+            case RequestClient::Post:
+            case RequestClient::Put:
                 str.append(QString("--data '%1'").arg(this->body));
                 break;
             default:
@@ -131,22 +131,22 @@ public:
             }
         }
         switch (this->method) {
-        case RequestUtil::Head:
+        case RequestClient::Head:
             replyScope.reset(qnam.head(networkRequest));
             break;
-        case RequestUtil::Get:
+        case RequestClient::Get:
             replyScope.reset(qnam.get(networkRequest));
             break;
-        case RequestUtil::Post:
+        case RequestClient::Post:
             replyScope.reset(qnam.post(networkRequest,this->body));
             break;
-        case RequestUtil::Put:
+        case RequestClient::Put:
             replyScope.reset(qnam.put(networkRequest,this->body));
             break;
-        case RequestUtil::Delete:
+        case RequestClient::Delete:
             replyScope.reset(qnam.deleteResource(networkRequest));
             break;
-        case RequestUtil::List:
+        case RequestClient::List:
             replyScope.reset(qnam.sendCustomRequest(networkRequest,__list,this->body));
             break;
         default:
@@ -205,7 +205,7 @@ private slots:
             this->response.error=QNetworkReply::UnknownNetworkError;
             this->response.reasonPhrase=eNetworkError.key(this->response.error);
             if(this->response.onFail)
-                this->response.onFail(RequestUtil::Response(this->parent->response()));
+                this->response.onFail(RequestClient::Response(this->parent->response()));
             if(this->printOnFail)
                 this->print();
         }
@@ -222,10 +222,10 @@ private slots:
                 this->response.body=reply->readAll();
             }
             if(this->response.isOK()){
-                this->response.onSuccessful(RequestUtil::Response(this->parent->response()));
+                this->response.onSuccessful(RequestClient::Response(this->parent->response()));
             }
             else{
-                this->response.onFail(RequestUtil::Response(this->parent->response()));
+                this->response.onFail(RequestClient::Response(this->parent->response()));
                 if(this->printOnFail)
                     this->print();
             }
@@ -244,7 +244,7 @@ private slots:
 #endif
 };
 
-const QVariantHash RequestUtil::Response::toMap() const
+const QVariantHash RequestClient::Response::toMap() const
 {
     return{
         {__statusCode,this->statusCode()}
@@ -254,251 +254,251 @@ const QVariantHash RequestUtil::Response::toMap() const
     };
 }
 
-bool RequestUtil::Response::isOK() const
+bool RequestClient::Response::isOK() const
 {
     return p->response.isOK();
 }
 
-bool RequestUtil::Response::isRunning() const
+bool RequestClient::Response::isRunning() const
 {
     return p->response.isRunning;
 }
 
-const QVariantHash &RequestUtil::Response::headers() const
+const QVariantHash &RequestClient::Response::headers() const
 {
     return p->response.headers;
 }
 
-int RequestUtil::Response::statusCode() const
+int RequestClient::Response::statusCode() const
 {
     return p->response.statusCode;
 }
 
-QString RequestUtil::Response::reasonPhrase()const
+QString RequestClient::Response::reasonPhrase()const
 {
     return p->response.reasonPhrase;
 }
 
-const QByteArray &RequestUtil::Response::body() const
+const QByteArray &RequestClient::Response::body() const
 {
     return p->response.body;
 }
 
-const QVariantHash RequestUtil::Response::bodyAsMap() const
+const QVariantHash RequestClient::Response::bodyAsMap() const
 {
     return QJsonDocument::fromJson(p->response.body).toVariant().toHash();
 }
 
-const QVariantList RequestUtil::Response::bodyAsList() const
+const QVariantList RequestClient::Response::bodyAsList() const
 {
     return QJsonDocument::fromJson(p->response.body).toVariant().toList();
 }
 
-const QStringList RequestUtil::Response::bodyAsStringList() const
+const QStringList RequestClient::Response::bodyAsStringList() const
 {
     return QJsonDocument::fromJson(p->response.body).toVariant().toStringList();
 }
 
-RequestUtil::RequestUtil(QObject *parent):QObject{parent},p{new RequestClientPvt{this}}
+RequestClient::RequestClient(QObject *parent):QObject{parent},p{new RequestClientPvt{this}}
 {
 }
 
-RequestUtil &RequestUtil::builder(QObject *parent)
+RequestClient &RequestClient::builder(QObject *parent)
 {
-    return *(new RequestUtil(parent));
+    return *(new RequestClient(parent));
 }
 
-const RequestUtil &RequestUtil::onStarted(VoidMethod method) const
+const RequestClient &RequestClient::onStarted(VoidMethod method) const
 {
     p->response.onStarted=method;
     return *this;
 }
 
-const RequestUtil &RequestUtil::onSent(VoidMethod method) const
+const RequestClient &RequestClient::onSent(VoidMethod method) const
 {
     p->response.onSent=method;
     return *this;
 }
 
-const RequestUtil &RequestUtil::onSuccessful(ResponseMethod method) const
+const RequestClient &RequestClient::onSuccessful(ResponseMethod method) const
 {
     p->response.onSuccessful=method;
     return *this;
 }
 
-const RequestUtil &RequestUtil::onFail(ResponseMethod method) const
+const RequestClient &RequestClient::onFail(ResponseMethod method) const
 {
     p->response.onFail=method;
     return *this;
 }
 
-const RequestUtil &RequestUtil::onFinished(RequestMethod method) const
+const RequestClient &RequestClient::onFinished(RequestMethod method) const
 {
     p->response.onFinished=method;
     return *this;
 }
 
-const RequestUtil &RequestUtil::call() const
+const RequestClient &RequestClient::call() const
 {
     p->call();
     return *this;
 }
 
-const RequestUtil &RequestUtil::abort()
+const RequestClient &RequestClient::abort()
 {
     p->abort();
     return *this;
 }
 
-bool RequestUtil::isOK() const
+bool RequestClient::isOK() const
 {
     return p->response.isOK();
 }
 
-const RequestUtil::Response RequestUtil::response()const
+const RequestClient::Response RequestClient::response()const
 {
-    return RequestUtil::Response(p);
+    return RequestClient::Response(p);
 }
 
-const RequestUtil &RequestUtil::HEAD() const
+const RequestClient &RequestClient::HEAD() const
 {
     return this->method(Head);
 }
 
-const RequestUtil &RequestUtil::GET() const
+const RequestClient &RequestClient::GET() const
 {
     return this->method(Get);
 }
 
-const RequestUtil &RequestUtil::POST() const
+const RequestClient &RequestClient::POST() const
 {
     return this->method(Post);
 }
 
-const RequestUtil &RequestUtil::PUT() const
+const RequestClient &RequestClient::PUT() const
 {
     return this->method(Put);
 }
 
-const RequestUtil &RequestUtil::DELETE() const
+const RequestClient &RequestClient::DELETE() const
 {
     return this->method(Delete);
 }
 
-const RequestUtil &RequestUtil::LIST() const
+const RequestClient &RequestClient::LIST() const
 {
     return this->method(List);
 }
 
-const RequestUtil &RequestUtil::print() const
+const RequestClient &RequestClient::print() const
 {
     p->print();
     return *this;
 }
 
-const RequestUtil &RequestUtil::printOnFail()const
+const RequestClient &RequestClient::printOnFail()const
 {
     p->printOnFail=true;
     return *this;
 }
 
-const RequestUtil &RequestUtil::printOnFail(bool newValue)const
+const RequestClient &RequestClient::printOnFail(bool newValue)const
 {
     p->printOnFail=newValue;
     return *this;
 }
 
-bool RequestUtil::aSync()
+bool RequestClient::aSync()
 {
     return p->aSync;
 }
 
-const RequestUtil &RequestUtil::aSync(bool newASync) const
+const RequestClient &RequestClient::aSync(bool newASync) const
 {
     p->aSync=newASync;
     return *this;
 }
 
-RequestUtil::Method RequestUtil::method()
+RequestClient::Method RequestClient::method()
 {
     return p->method;
 }
 
-const RequestUtil &RequestUtil::method(Method newMethod) const
+const RequestClient &RequestClient::method(Method newMethod) const
 {
     p->method=newMethod;
     return *this;
 }
 
-const QVariantHash &RequestUtil::headers() const
+const QVariantHash &RequestClient::headers() const
 {
     return p->headers;
 }
 
-const RequestUtil &RequestUtil::headers(const QVariantHash &newHeaders) const
+const RequestClient &RequestClient::headers(const QVariantHash &newHeaders) const
 {
     p->headers=newHeaders;
     return *this;
 }
 
-const RequestUtil &RequestUtil::headers(const QString &key, const QString &value) const
+const RequestClient &RequestClient::headers(const QString &key, const QString &value) const
 {
     p->headers.insert(key, value);
     return *this;
 }
 
-const RequestUtil &RequestUtil::headerApplicationJson() const
+const RequestClient &RequestClient::headerApplicationJson() const
 {
     return this->headers(HttpEncoding::CONTENT_TYPE(), MediaType::APPLICATION_JSON());
 }
 
-const RequestUtil &RequestUtil::headerFormUrlencoded() const
+const RequestClient &RequestClient::headerFormUrlencoded() const
 {
     return this->headers(HttpEncoding::CONTENT_TYPE(), MediaType::APPLICATION_FORM_URLENCODED());
 }
 
-const RequestUtil &RequestUtil::headerApplicationOctecStream() const
+const RequestClient &RequestClient::headerApplicationOctecStream() const
 {
     return this->headers(HttpEncoding::CONTENT_TYPE(), MediaType::APPLICATION_OCTET_STREAM());
 }
 
-const RequestUtil &RequestUtil::headerApplicationCBor() const
+const RequestClient &RequestClient::headerApplicationCBor() const
 {
     return this->headers(HttpEncoding::CONTENT_TYPE(), MediaType::APPLICATION_CBOR());
 }
 
-const RequestUtil &RequestUtil::headerTextPlain() const
+const RequestClient &RequestClient::headerTextPlain() const
 {
     return this->headers(HttpEncoding::CONTENT_TYPE(), MediaType::TEXT_PLAIN());
 }
 
-const RequestUtil &RequestUtil::headerApplicationPdf() const
+const RequestClient &RequestClient::headerApplicationPdf() const
 {
     return this->headers(HttpEncoding::CONTENT_TYPE(), MediaType::APPLICATION_PDF());
 }
 
-const RequestUtil &RequestUtil::headerApplicationXml() const
+const RequestClient &RequestClient::headerApplicationXml() const
 {
     return this->headers(HttpEncoding::CONTENT_TYPE(), MediaType::APPLICATION_XML());
 }
 
-const QUrl &RequestUtil::url() const
+const QUrl &RequestClient::url() const
 {
     return p->url;
 }
 
-const RequestUtil &RequestUtil::url(const QUrl &newUrl) const
+const RequestClient &RequestClient::url(const QUrl &newUrl) const
 {
     p->url=newUrl;
     return *this;
 }
 
-const QVariantHash &RequestUtil::args() const
+const QVariantHash &RequestClient::args() const
 {
     return p->args;
 }
 
-const RequestUtil &RequestUtil::args(const QString &key, const QVariant &value) const
+const RequestClient &RequestClient::args(const QString &key, const QVariant &value) const
 {
     QByteArray valueBytes;
     switch(value.typeId()){
@@ -516,12 +516,12 @@ const RequestUtil &RequestUtil::args(const QString &key, const QVariant &value) 
     return *this;
 }
 
-const RequestUtil &RequestUtil::args(const QPair<QVariant, QVariant> &newArg) const
+const RequestClient &RequestClient::args(const QPair<QVariant, QVariant> &newArg) const
 {
     return this->args(newArg.first.toString(), newArg.second);
 }
 
-const RequestUtil &RequestUtil::args(const QVariantHash &newArgs) const
+const RequestClient &RequestClient::args(const QVariantHash &newArgs) const
 {
     p->args.clear();
     QHashIterator<QString,QVariant> i(newArgs);
@@ -532,17 +532,17 @@ const RequestUtil &RequestUtil::args(const QVariantHash &newArgs) const
     return *this;
 }
 
-const RequestUtil &RequestUtil::args(const QVariantMap &newArgs) const
+const RequestClient &RequestClient::args(const QVariantMap &newArgs) const
 {
     return this->args(QVariant(newArgs).toHash());
 }
 
-const QByteArray &RequestUtil::body() const
+const QByteArray &RequestClient::body() const
 {
     return p->body;
 }
 
-const RequestUtil &RequestUtil::body(const QVariant &newBody) const
+const RequestClient &RequestClient::body(const QVariant &newBody) const
 {
     switch(newBody.typeId()){
     case QMetaType::QStringList:

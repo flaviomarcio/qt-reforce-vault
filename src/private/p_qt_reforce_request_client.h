@@ -9,21 +9,20 @@
 #include <QStringList>
 #include "../qt_reforce_vault_global.h"
 
-namespace QtVault {
+namespace QtReforce {
 class RequestClientPvt;
 
 //!
-//! \brief The RequestUtil class
+//! \brief The RequestClient class
 //!
-
-class Q_REFORCE_VAULT_EXPORT RequestUtil: public QObject
+class Q_REFORCE_VAULT_EXPORT RequestClient: public QObject
 {
     Q_OBJECT
 public:
     struct Response
     {
         friend class RequestClientPvt;
-        friend class RequestUtil;
+        friend class RequestClient;
     private:
         explicit Response(RequestClientPvt *p):p{p}{}
     public:
@@ -103,7 +102,7 @@ public:
     };
 
     typedef std::function<void()> VoidMethod;
-    typedef std::function<void(RequestUtil *request)> RequestMethod;
+    typedef std::function<void(RequestClient *request)> RequestMethod;
     typedef std::function<void(Response response)> ResponseMethod;
 
     class HttpEncoding {
@@ -155,55 +154,55 @@ public:
     //! \brief RequestUtil
     //! \param parent
     //!
-    Q_INVOKABLE explicit RequestUtil(QObject *parent=nullptr);
+    Q_INVOKABLE explicit RequestClient(QObject *parent=nullptr);
 
     //!
     //! \brief builder
     //! \return
     //!
-    static RequestUtil &builder(QObject *parent=nullptr);
+    static RequestClient &builder(QObject *parent=nullptr);
 
     //!
     //! \brief onStarted
     //! \param method
     //!
-    const RequestUtil &onStarted(RequestUtil::VoidMethod method)const;
+    const RequestClient &onStarted(RequestClient::VoidMethod method)const;
 
     //!
     //! \brief onSent
     //! \param method
     //!
-    const RequestUtil &onSent(RequestUtil::VoidMethod method)const;
+    const RequestClient &onSent(RequestClient::VoidMethod method)const;
 
     //!
     //! \brief onSuccessful
     //! \param method
     //!
-    const RequestUtil &onSuccessful(RequestUtil::ResponseMethod method)const;
+    const RequestClient &onSuccessful(RequestClient::ResponseMethod method)const;
 
     //!
     //! \brief onFail
     //! \param method
     //!
-    const RequestUtil &onFail(RequestUtil::ResponseMethod method)const;
+    const RequestClient &onFail(RequestClient::ResponseMethod method)const;
 
     //!
     //! \brief onFinished
     //! \param method
     //!
-    const RequestUtil &onFinished(RequestMethod method)const;
+    const RequestClient &onFinished(RequestMethod method)const;
 
     //!
     //! \brief call
     //! \return
     //!
-    const RequestUtil &call()const;
+    const RequestClient &call()const;
 
     //!
     //! \brief abort
     //! \return
     //!
-    const RequestUtil &abort();
+    const RequestClient &abort();
 
     //!
     //! \brief isOK
@@ -221,138 +220,138 @@ public:
     //! \brief HEAD
     //! \return
     //!
-    const RequestUtil &HEAD()const;
+    const RequestClient &HEAD()const;
 
     //!
     //! \brief GET
     //! \return
     //!
-    const RequestUtil &GET()const;
+    const RequestClient &GET()const;
 
     //!
     //! \brief POST
     //! \return
     //!
-    const RequestUtil &POST()const;
+    const RequestClient &POST()const;
 
     //!
     //! \brief PUT
     //! \return
     //!
-    const RequestUtil &PUT()const;
+    const RequestClient &PUT()const;
 
     //!
     //! \brief DELETE
     //! \return
     //!
-    const RequestUtil &DELETE()const;
+    const RequestClient &DELETE()const;
 
     //!
     //! \brief LIST
     //! \return
     //!
-    const RequestUtil &LIST()const;
+    const RequestClient &LIST()const;
 
     //!
     //! \brief print
     //! \return
     //!
-    const RequestUtil &print()const;
+    const RequestClient &print()const;
 
     //!
     //! \brief printOnFail
     //! \return
     //!
-    const RequestUtil &printOnFail() const;
-    const RequestUtil &printOnFail(bool newValue) const;
+    const RequestClient &printOnFail() const;
+    const RequestClient &printOnFail(bool newValue) const;
 
     //!
     //! \brief aSync
     //! \return
     //!
     bool aSync();
-    const RequestUtil &aSync(bool newASync)const;
+    const RequestClient &aSync(bool newASync)const;
 
     //!
     //! \brief method
     //! \return
     //!
     Method method();
-    const RequestUtil &method(Method newMethod)const;
+    const RequestClient &method(Method newMethod)const;
 
     //!
     //! \brief headers
     //! \return
     //!
     const QVariantHash &headers()const;
-    const RequestUtil &headers(const QVariantHash &newHeaders)const;
-    const RequestUtil &headers(const QString&key, const QString &value)const;
+    const RequestClient &headers(const QVariantHash &newHeaders)const;
+    const RequestClient &headers(const QString&key, const QString &value)const;
 
     //!
     //! \brief headerApplicationJson
     //! \return
     //!
-    const RequestUtil &headerApplicationJson()const;
+    const RequestClient &headerApplicationJson()const;
 
     //!
     //! \brief headerFormUrlencoded
     //! \return
     //!
-    const RequestUtil &headerFormUrlencoded()const;
+    const RequestClient &headerFormUrlencoded()const;
 
     //!
     //! \brief headerApplicationOctecStream
     //! \return
     //!
-    const RequestUtil &headerApplicationOctecStream()const;
+    const RequestClient &headerApplicationOctecStream()const;
 
     //!
     //! \brief headerApplicationCBor
     //! \return
     //!
-    const RequestUtil &headerApplicationCBor()const;
+    const RequestClient &headerApplicationCBor()const;
 
     //!
     //! \brief headerTextPlain
     //! \return
     //!
-    const RequestUtil &headerTextPlain()const;
+    const RequestClient &headerTextPlain()const;
 
     //!
     //! \brief headerApplicationXml
     //! \return
     //!
-    const RequestUtil &headerApplicationXml()const;
+    const RequestClient &headerApplicationXml()const;
 
     //!
     //! \brief headerApplicationPdf
     //! \return
     //!
-    const RequestUtil &headerApplicationPdf()const;
+    const RequestClient &headerApplicationPdf()const;
 
     //!
     //! \brief url
     //! \return
     //!
     const QUrl &url()const;
-    const RequestUtil &url(const QUrl &newUrl)const;
+    const RequestClient &url(const QUrl &newUrl)const;
 
     //!
     //! \brief args
     //! \return
     //!
     const QVariantHash &args()const;
-    const RequestUtil &args(const QString &key, const QVariant &value)const;
-    const RequestUtil &args(const QPair<QVariant, QVariant> &newArg)const;
-    const RequestUtil &args(const QVariantHash &newArgs)const;
-    const RequestUtil &args(const QVariantMap &newArgs)const;
+    const RequestClient &args(const QString &key, const QVariant &value)const;
+    const RequestClient &args(const QPair<QVariant, QVariant> &newArg)const;
+    const RequestClient &args(const QVariantHash &newArgs)const;
+    const RequestClient &args(const QVariantMap &newArgs)const;
 
     //!
     //! \brief body
     //! \return
     //!
     const QByteArray &body()const;
-    const RequestUtil &body(const QVariant &newBody)const;
+    const RequestClient &body(const QVariant &newBody)const;
 
 private:
     //!

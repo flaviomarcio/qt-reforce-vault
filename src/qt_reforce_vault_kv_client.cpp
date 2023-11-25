@@ -1,6 +1,6 @@
 #include "./qt_reforce_vault_kv_client.h"
 #include "./qt_reforce_vault_setting.h"
-#include "./private/p_qt_reforce_vault_request_util.h"
+#include "./private/p_qt_reforce_request_client.h"
 #include "./private/p_qt_reforce_vault_utils.h"
 #include "./private/p_qt_reforce_vault_logs.h"
 #include <QFile>
@@ -14,6 +14,8 @@
 //  https://developer.hashicorp.com/vault/tutorials/getting-started/getting-started-intro
 //  https://developer.hashicorp.com/vault/tutorials/getting-started/getting-started-apis
 //  https://developer.hashicorp.com/vault/tutorials/getting-started/getting-started-authentication
+
+using namespace QtReforce;
 
 namespace QtVault{
 
@@ -152,7 +154,7 @@ public:
         this->isSuccessful=false;
     }
 
-    void emitFail(const RequestUtil::Response &response)
+    void emitFail(const RequestClient::Response &response)
     {
         qCritical()<<response.body();
         emitFail(response.bodyAsMap());
@@ -167,16 +169,16 @@ public:
     auto makeRequest()
     {
         this->isLoading=true;
-        return &RequestUtil::builder(this)
+        return &RequestClient::builder(this)
                     .onStarted([](){})
                     .onFail(
-                        [this](RequestUtil::Response response)
+                        [this](RequestClient::Response response)
                         {
                             emitFail(response);
                         }
                         )
                     .onFinished(
-                        [this](RequestUtil *r)
+                        [this](RequestClient *r)
                         {
                             r->deleteLater();
                             this->isLoading=false;
@@ -188,7 +190,7 @@ public:
                     .headers(__X_Vault_Token, getCurrentToken());
     }
 
-    void auth(RequestUtil::VoidMethod callbackSuccess)
+    void auth(RequestClient::VoidMethod callbackSuccess)
     {
         if(this->isAuthenticated){
             callbackSuccess();
@@ -205,7 +207,7 @@ public:
         auto &req=*makeRequest();
         req
             .onSuccessful(
-                [this, &callbackSuccess](RequestUtil::Response response)
+                [this, &callbackSuccess](RequestClient::Response response)
                 {
                     auto map=response.bodyAsMap();
                     this->currentToken=map.value(__auth).toHash().value(__client_token).toByteArray().trimmed();
@@ -234,7 +236,7 @@ public:
                 auto &req=*makeRequest();
                 req
                     .onSuccessful(
-                        [this](RequestUtil::Response response)
+                        [this](RequestClient::Response response)
                         {
                             this->setValues(response.bodyAsMap());
                             if(this->onLoaded)
@@ -258,7 +260,7 @@ public:
                 auto &req=*makeRequest();
                 req
                     .onSuccessful(
-                        [this](RequestUtil::Response response)
+                        [this](RequestClient::Response response)
                         {
                             this->vaultMetaData=response.bodyAsMap();
                             this->isSuccessful=true;
