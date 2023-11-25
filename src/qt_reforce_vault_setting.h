@@ -16,18 +16,21 @@ class KvClient;
 class Q_REFORCE_VAULT_EXPORT Setting: public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QVariant printOnFail READ printOnFail WRITE printOnFail RESET resetPrintOnFail NOTIFY printOnFailChanged FINAL)
     Q_PROPERTY(QVariant method READ method WRITE method RESET resetMethod NOTIFY methodChanged FINAL)
     Q_PROPERTY(QVariant url READ url WRITE url RESET resetUrl NOTIFY urlChanged FINAL)
     Q_PROPERTY(QVariant version READ version WRITE version RESET resetVersion NOTIFY versionChanged FINAL)
+    Q_PROPERTY(QVariant nameSpace READ nameSpace WRITE nameSpace RESET resetNameSpace NOTIFY nameSpaceChanged FINAL)
     Q_PROPERTY(QVariant token READ token WRITE token RESET resetToken NOTIFY tokenChanged FINAL)
     Q_PROPERTY(QVariant roleId READ roleId WRITE roleId RESET resetRoleId NOTIFY roleIdChanged FINAL)
     Q_PROPERTY(QVariant secretId READ secretId WRITE secretId RESET resetSecretId NOTIFY secretIdChanged FINAL)
     Q_PROPERTY(QVariant secretsPath READ secretsPath WRITE secretsPath RESET resetSecretsPath NOTIFY secretsPathChanged FINAL)
     Q_PROPERTY(QVariant secretsName READ secretsName WRITE secretsName RESET resetSecretsName NOTIFY secretsNameChanged FINAL)
     Q_PROPERTY(QVariant secretsRevision READ secretsRevision WRITE secretsRevision RESET resetSecretsRevision NOTIFY secretsRevisionChanged FINAL)
+
 public:
     enum Method{
-        Token, RoleId
+        Token, AppRole
     };
     Q_ENUM(Method)
 
@@ -55,7 +58,15 @@ public:
     //! \param newValues
     //! \return
     //!
-    Setting &setValues(const QVariant &newValues);
+    const Setting &setValues(const QVariant &newValues);
+
+    //!
+    //! \brief printOnFail
+    //! \return
+    //!
+    bool printOnFail() const;
+    Setting &printOnFail(const QVariant &newPrintOnFail);
+    Setting &resetPrintOnFail();
 
     //!
     //! \brief url
@@ -80,6 +91,14 @@ public:
     const QByteArray &version() const;
     Setting &version(const QVariant &newValues);
     Setting &resetVersion();
+
+    //!
+    //! \brief nameSpace
+    //! \return
+    //!
+    const QByteArray &nameSpace() const;
+    Setting &nameSpace(const QVariant &newValues);
+    Setting &resetNameSpace();
 
     //!
     //! \brief token
@@ -138,10 +157,11 @@ private:
     SettingPvt *p=nullptr;
 
 signals:
-
+    void printOnFailChanged();
     void urlChanged();
     void methodChanged();
     void versionChanged();
+    void nameSpaceChanged();
     void tokenChanged();
     void roleIdChanged();
     void secretIdChanged();

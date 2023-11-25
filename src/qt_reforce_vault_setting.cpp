@@ -29,10 +29,15 @@ class SettingPvt:public QObject
 public:
     const QStringList ignore_methods={"destroyed", "objectName", "objectNameChanged", "deleteLater", "_q_reregisterTimers"};
     Setting *parent;
+#ifdef QT_DEBUG
+    bool printOnFail=true;
+#else
+    bool printOnFail=false;
+#endif
     Setting::Method method=Setting::Token;
     QUrl url=QUrl(__vault_default_url);
     QByteArray version;
-    QByteArray token, roleId, secretId;
+    QByteArray token, roleId, secretId, nameSpace;
     QUrl secretsPath=QUrl(__vault_default_path);
     QByteArray secretsName;
     int secretsRevision=0;
@@ -103,11 +108,35 @@ Setting &Setting::clear()
     return *this;
 }
 
-Setting &Setting::setValues(const QVariant &newValues)
+const Setting &Setting::setValues(const QVariant &newValues)
 {
     this->clear();
     p->setValues(newValues);
     return *this;
+}
+
+bool Setting::printOnFail() const
+{
+    return p->printOnFail;
+}
+
+Setting &Setting::printOnFail(const QVariant &newPrintOnFail)
+{
+    auto env=newPrintOnFail.toBool();
+    if(env==p->printOnFail)
+        return *this;
+    p->printOnFail=env;
+    emit printOnFailChanged();
+    return *this;
+}
+
+Setting &Setting::resetPrintOnFail()
+{
+#ifdef QT_DEBUG
+    return this->printOnFail(true);
+#else
+    return this->printOnFail(false);
+#endif
 }
 
 const QUrl &Setting::url() const
@@ -185,6 +214,25 @@ Setting &Setting::resetVersion()
 const QByteArray &Setting::token() const
 {
     return p->token;
+}
+
+const QByteArray &Setting::nameSpace() const
+{
+    return p->nameSpace;
+}
+
+Setting &Setting::nameSpace(const QVariant &newValues)
+{
+    if (p->nameSpace == newValues.toString().trimmed())
+        return *this;
+    p->nameSpace = newValues.toByteArray().trimmed();
+    emit nameSpaceChanged();
+    return *this;
+}
+
+Setting &Setting::resetNameSpace()
+{
+    return this->nameSpace({});
 }
 
 Setting &Setting::token(const QVariant &newValues)
