@@ -4,7 +4,21 @@
 #include "./qt_reforce_vault_test.h"
 #include "../src/qt_reforce_vault_kv_client.h"
 
+//http://localhost/ui/vault/tools/api-explorer
+
 namespace QtReforce {
+
+static QString VAULT_ADDR()
+{
+    QString env=getenv("VAULT_ADDR");
+    return !env.isEmpty()?env:"http://localhost:1234";
+}
+
+static QString VAULT_TOKEN()
+{
+    QString env=getenv("VAULT_TOKEN");
+    return !env.isEmpty()?env:"00000000-0000-0000-0000-000000000000";
+}
 
 class UT_KvClient : public QtReforce::ObjectTest
 {
@@ -12,8 +26,8 @@ class UT_KvClient : public QtReforce::ObjectTest
     Q_VAULT_OBJECT_TEST(UT_KvClient)
 public:
     const QVariantHash settings={
-                                   {"url","http://localhost:1234"},
-                                   {"token","00000000-0000-0000-0000-000000000000"},
+                                   {"url",VAULT_ADDR()},
+                                   {"token",VAULT_TOKEN()},
                                    {"secretsPath","vault://secret/secret"},
                                    {"secretsName","YourAppName"},
                                    };
@@ -29,19 +43,21 @@ public:
 
         kvClient
             .setting(settings)
-            .pull();
+            .values(data)
+            .push()
+            .clear();
 
-        while(kvClient.isLoading()){
-            QThread::msleep(1);
-            qApp->processEvents();
-        }
+        QVERIFY(!kvClient.setting(settings).clean().pull().metaData().isEmpty());
         auto values=kvClient.get();
 
-        QCOMPARE_EQ(values.size(),2);
-        QVERIFY(values.contains("a"));
-        QVERIFY(values.contains("c"));
-        QCOMPARE_EQ(values.value("a"),"bbbbb");
-        QCOMPARE_EQ(values.value("c"),"dddddd");
+        QCOMPARE_EQ(values.size(),data.size());
+
+        QHashIterator<QString, QVariant> i(data);
+        while (i.hasNext()){
+            i.next();
+            QVERIFY(values.contains(i.key()));
+            QCOMPARE_EQ(values.value(i.key()),data.value(i.key()));
+        }
     }
 
     void connectionExemple()
@@ -65,9 +81,11 @@ public:
     void gettingValues()
     {
         QtVault::KvClient kvClient(settings);
-        kvClient
+        qDebug()<<
+            kvClient
             //clean existing values and replace from values of vault server
-            .pull();
+            .pull()
+            .metaData();
         qDebug()
             //getting all existing values
             <<kvClient.get()
