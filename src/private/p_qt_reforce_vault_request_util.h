@@ -4,6 +4,7 @@
 #include <QUrl>
 #include <QVariant>
 #include <QVariantHash>
+#include <QVariantMap>
 #include <QVariantList>
 #include <QStringList>
 #include "../qt_reforce_vault_global.h"
@@ -146,7 +147,7 @@ public:
     };
 
     enum Method{
-        Head,Get,Post,Put,Delete,List
+        Head, Get, Post, Put, Delete, List, Upload, Download
     };
     Q_ENUM(Method)
 
@@ -253,6 +254,26 @@ public:
     const RequestUtil &LIST()const;
 
     //!
+    //! \brief print
+    //! \return
+    //!
+    const RequestUtil &print()const;
+
+    //!
+    //! \brief printOnFail
+    //! \return
+    //!
+    const RequestUtil &printOnFail() const;
+    const RequestUtil &printOnFail(bool newValue) const;
+
+    //!
+    //! \brief aSync
+    //! \return
+    //!
+    bool aSync();
+    const RequestUtil &aSync(bool newASync)const;
+
+    //!
     //! \brief method
     //! \return
     //!
@@ -317,10 +338,20 @@ public:
     const RequestUtil &url(const QUrl &newUrl)const;
 
     //!
+    //! \brief args
+    //! \return
+    //!
+    const QVariantHash &args()const;
+    const RequestUtil &args(const QString &key, const QVariant &value)const;
+    const RequestUtil &args(const QPair<QVariant, QVariant> &newArg)const;
+    const RequestUtil &args(const QVariantHash &newArgs)const;
+    const RequestUtil &args(const QVariantMap &newArgs)const;
+
+    //!
     //! \brief body
     //! \return
     //!
-    const QVariant &body()const;
+    const QByteArray &body()const;
     const RequestUtil &body(const QVariant &newBody)const;
 
 private:

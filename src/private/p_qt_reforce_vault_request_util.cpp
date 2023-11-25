@@ -5,6 +5,9 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QMetaEnum>
+#include <QEventLoop>
+#include <QDebug>
+#include <QVariant>
 
 namespace QtVault{
 
@@ -50,35 +53,66 @@ class RequestUtilPvt:public QObject
 {
 public:
     RequestUtil *parent;
+    bool aSync=false;
+    bool printOnFail=false;
     RequestUtil::Method method=RequestUtil::Get;
     QUrl url;
-    QVariantHash headers;
-    QVariant body;
+    QVariantHash headers, args;
+    QByteArray body;
     ResponsePvt response;
-
     QNetworkAccessManager qnam;
     QScopedPointer<QNetworkReply, QScopedPointerDeleteLater> replyScope;
     explicit RequestUtilPvt(RequestUtil *parent):QObject{parent},parent{parent}{
 
     }
 
+    void print() {
+        auto e=QMetaEnum::fromType<RequestUtil::Method>();
+        auto method=(this->method==RequestUtil::Method::Upload)
+                          ?RequestUtil::Method::Post
+                          :this->method;
+        auto methodName=QByteArray(e.valueToKey(method)).toUpper();
+        QStringList str;
+        str.append(QString("curl -i -X %1").arg(methodName));
+        if(this->method==RequestUtil::Upload)
+            str.append(QString("-F \"file=@%1\"").arg(this->body));
+
+        str.append(QString("--location \"%1\"").arg(this->url.toString()));
+        {
+            QHashIterator<QString,QVariant> i(this->headers);
+            while(i.hasNext()){
+                i.next();
+                str.append(QString("--header '%1: %2'").arg(i.key(),i.value().toString()));
+            }
+        }
+        {
+            QHashIterator<QString,QVariant> i(this->args);
+            while(i.hasNext()){
+                i.next();
+                str.append(QString("--data-urlencode \"%1=%2\"").arg(i.key(), i.value().toString()));
+            }
+        }
+        if(!this->body.isEmpty()){
+            switch (this->method) {
+            case RequestUtil::Post:
+            case RequestUtil::Put:
+                str.append(QString("--data '%1'").arg(this->body));
+                break;
+            default:
+                break;
+            }
+        }
+
+        qDebug()<<"Request:";
+        qDebug()<<"   "+str.join(' ').toUtf8();
+        qDebug()<<"response:";
+        qDebug()<<"   statusCode: "<<response.statusCode;
+        qDebug()<<"   code: "<<response.body;
+    }
+
     QUrl makeUrlArgs()
     {
         return this->url;
-    }
-
-    QByteArray makeBody()
-    {
-        switch (this->body.typeId()) {
-        case QMetaType::QVariantPair:
-        case QMetaType::QVariantHash:
-        case QMetaType::QVariantMap:
-        case QMetaType::QVariantList:
-        case QMetaType::QStringList:
-            return QJsonDocument::fromVariant(this->body).toJson(QJsonDocument::Compact);
-        default:
-            return this->body.toByteArray();
-        }
     }
 
     QNetworkReply *makeReply()
@@ -104,16 +138,16 @@ public:
             replyScope.reset(qnam.get(networkRequest));
             break;
         case RequestUtil::Post:
-            replyScope.reset(qnam.post(networkRequest,this->makeBody()));
+            replyScope.reset(qnam.post(networkRequest,this->body));
             break;
         case RequestUtil::Put:
-            replyScope.reset(qnam.put(networkRequest,this->makeBody()));
+            replyScope.reset(qnam.put(networkRequest,this->body));
             break;
         case RequestUtil::Delete:
             replyScope.reset(qnam.deleteResource(networkRequest));
             break;
         case RequestUtil::List:
-            replyScope.reset(qnam.sendCustomRequest(networkRequest,__list,this->makeBody()));
+            replyScope.reset(qnam.sendCustomRequest(networkRequest,__list,this->body));
             break;
         default:
             replyScope->reset();
@@ -130,6 +164,7 @@ public:
 
     void call()
     {
+        QEventLoop loop;
         auto reply=this->makeReply();
         if(reply==nullptr){
             this->httpStarted();
@@ -142,7 +177,14 @@ public:
 #if QT_CONFIG(ssl)
         connect(reply, &QNetworkReply::sslErrors, this, &RequestUtilPvt::sslErrors);
 #endif
+        if(!this->aSync){
+            QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+            loop.exec();
+        }
     }
+
+
+
 private slots:
     void httpStarted()
     {
@@ -164,6 +206,8 @@ private slots:
             this->response.reasonPhrase=eNetworkError.key(this->response.error);
             if(this->response.onFail)
                 this->response.onFail(RequestUtil::Response(this->parent->response()));
+            if(this->printOnFail)
+                this->print();
         }
         else{
             this->response.error = reply->error();
@@ -177,10 +221,14 @@ private slots:
                 this->response.reasonPhrase=eNetworkError.key(this->response.error);
                 this->response.body=reply->readAll();
             }
-            if(this->response.isOK())
+            if(this->response.isOK()){
                 this->response.onSuccessful(RequestUtil::Response(this->parent->response()));
-            else
+            }
+            else{
                 this->response.onFail(RequestUtil::Response(this->parent->response()));
+                if(this->printOnFail)
+                    this->print();
+            }
         }
         this->replyScope.reset();
         if(response.onFinished!=nullptr)
@@ -199,9 +247,9 @@ private slots:
 const QVariantHash RequestUtil::Response::toMap() const
 {
     return{
-             {__statusCode,this->statusCode()}
-            ,{__reasonPhrase,this->reasonPhrase()}
-            ,{__responseBody, this->body()}
+        {__statusCode,this->statusCode()}
+        ,{__reasonPhrase,this->reasonPhrase()}
+        ,{__responseBody, this->body()}
 
     };
 }
@@ -342,6 +390,35 @@ const RequestUtil &RequestUtil::LIST() const
     return this->method(List);
 }
 
+const RequestUtil &RequestUtil::print() const
+{
+    p->print();
+    return *this;
+}
+
+const RequestUtil &RequestUtil::printOnFail()const
+{
+    p->printOnFail=true;
+    return *this;
+}
+
+const RequestUtil &RequestUtil::printOnFail(bool newValue)const
+{
+    p->printOnFail=newValue;
+    return *this;
+}
+
+bool RequestUtil::aSync()
+{
+    return p->aSync;
+}
+
+const RequestUtil &RequestUtil::aSync(bool newASync) const
+{
+    p->aSync=newASync;
+    return *this;
+}
+
 RequestUtil::Method RequestUtil::method()
 {
     return p->method;
@@ -416,14 +493,68 @@ const RequestUtil &RequestUtil::url(const QUrl &newUrl) const
     return *this;
 }
 
-const QVariant &RequestUtil::body() const
+const QVariantHash &RequestUtil::args() const
+{
+    return p->args;
+}
+
+const RequestUtil &RequestUtil::args(const QString &key, const QVariant &value) const
+{
+    QByteArray valueBytes;
+    switch(value.typeId()){
+    case QMetaType::QStringList:
+    case QMetaType::QVariantList:
+    case QMetaType::QVariantHash:
+    case QMetaType::QVariantMap:
+    case QMetaType::QVariantPair:
+        valueBytes=QJsonDocument::fromVariant(value).toJson(QJsonDocument::Compact);
+        break;
+    default:
+        valueBytes=value.toByteArray().trimmed();
+    }
+    p->args.insert(key, valueBytes);
+    return *this;
+}
+
+const RequestUtil &RequestUtil::args(const QPair<QVariant, QVariant> &newArg) const
+{
+    return this->args(newArg.first.toString(), newArg.second);
+}
+
+const RequestUtil &RequestUtil::args(const QVariantHash &newArgs) const
+{
+    p->args.clear();
+    QHashIterator<QString,QVariant> i(newArgs);
+    while(i.hasNext()){
+        i.next();
+        this->args(i.key(), i.value());
+    }
+    return *this;
+}
+
+const RequestUtil &RequestUtil::args(const QVariantMap &newArgs) const
+{
+    return this->args(QVariant(newArgs).toHash());
+}
+
+const QByteArray &RequestUtil::body() const
 {
     return p->body;
 }
 
 const RequestUtil &RequestUtil::body(const QVariant &newBody) const
 {
-    p->body=newBody;
+    switch(newBody.typeId()){
+    case QMetaType::QStringList:
+    case QMetaType::QVariantList:
+    case QMetaType::QVariantHash:
+    case QMetaType::QVariantMap:
+    case QMetaType::QVariantPair:
+        p->body=QJsonDocument::fromVariant(newBody).toJson(QJsonDocument::Compact);
+        break;
+    default:
+        p->body=newBody.toByteArray().trimmed();
+    }
     return *this;
 }
 
