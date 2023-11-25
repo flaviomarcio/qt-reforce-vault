@@ -1,6 +1,10 @@
 #include "./qt_reforce_vault_kv_client.h"
 #include "./qt_reforce_vault_setting.h"
+#ifdef QTREFORCE_QREQUEST_CLIENT
+#include "../../qtrequestclient/src/qt_reforce_request_client.h"
+#else
 #include "./private/p_qt_reforce_request_client.h"
+#endif
 #include "./private/p_qt_reforce_vault_utils.h"
 #include "./private/p_qt_reforce_vault_logs.h"
 #include <QFile>

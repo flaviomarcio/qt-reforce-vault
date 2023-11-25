@@ -1,4 +1,3 @@
-#include "./p_qt_reforce_request_client.h"
 #include <QJsonDocument>
 #include <QNetworkAccessManager>
 #include <QScopedPointerDeleteLater>
@@ -9,6 +8,8 @@
 #include <QDebug>
 #include <QVariant>
 
+#ifndef QTREFORCE_QREQUEST_CLIENT
+#include "./p_qt_reforce_request_client.h"
 namespace QtReforce{
 
 static const auto __list="list";
@@ -560,3 +561,4 @@ const RequestClient &RequestClient::body(const QVariant &newBody) const
 
 }
 
+#endif

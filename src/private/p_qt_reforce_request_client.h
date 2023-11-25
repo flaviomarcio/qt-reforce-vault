@@ -7,15 +7,15 @@
 #include <QVariantMap>
 #include <QVariantList>
 #include <QStringList>
-#include "../qt_reforce_vault_global.h"
 
+#ifndef QTREFORCE_QREQUEST_CLIENT
 namespace QtReforce {
 class RequestClientPvt;
 
 //!
 //! \brief The RequestClient class
 //!
-class Q_REFORCE_VAULT_EXPORT RequestClient: public QObject
+class RequestClient: public QObject
 {
     Q_OBJECT
 public:
@@ -359,6 +359,6 @@ private:
     //!
     RequestClientPvt *p=nullptr;
 };
-
 }
 
+#endif
