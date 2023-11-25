@@ -222,10 +222,31 @@ public:
     bool isAuthenticated()const;
 
     //!
+    //! \brief login
+    //! \param token
+    //! \return
+    //!
+    const KvClient &login(const QByteArray &token);
+
+    //!
+    //! \brief login
+    //! \param roleId
+    //! \param secretId
+    //! \return
+    //!
+    const KvClient &login(const QByteArray &roleId, const QByteArray &secretId);
+
+    //!
     //! \brief pull
     //! \return
     //!
     const KvClient &pull()const;
+
+    //!
+    //! \brief metaData
+    //! \return
+    //!
+    const QVariantHash &metaData()const;
 
     //!
     //! \brief push
@@ -278,6 +299,12 @@ signals:
     //! \brief started
     //!
     void started();
+
+    //!
+    //! \brief authorized
+    //! \param kv
+    //!
+    void authorized();
 
     //!
     //! \brief loaded

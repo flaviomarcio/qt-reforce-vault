@@ -6,8 +6,8 @@
 #include <QFile>
 #include <QProcess>
 #include <QDebug>
-#include <QCoreApplication>
 #include <QJsonDocument>
+#include <QCoreApplication>
 
 
 //ref
@@ -24,8 +24,10 @@ static const auto __splitEnv="=";
 static const auto __X_Vault_Token="X-Vault-Token";
 static const auto __role_id="role_id";
 static const auto __secret_id="secret_id";
+static const auto __content_type="Content-Type";
+static const auto __application_json="application/json";
 
-Q_GLOBAL_STATIC(QVariantHash,systemEnvironment)
+Q_GLOBAL_STATIC(QVariantHash, systemEnvironment)
 
 QVariantHash makeEnvs()
 {
@@ -114,7 +116,10 @@ public:
 
     QUrl makeUrlVaultData()
     {
-        auto url=this->setting.url().toString();
+        auto nameSpace=this->setting.nameSpace().isEmpty()
+                             ?""
+                             :"/"+this->setting.nameSpace();
+        auto url=this->setting.url().toString()+nameSpace;
         auto version=this->setting.version().trimmed().toLower();
         auto import=this->setting.secretsName().trimmed();
         import=import.isEmpty()?"":("/"+import);
@@ -124,25 +129,50 @@ public:
         return QUrl(url);
     }
 
-    void emitFail(const QVariantHash &error)
+    QUrl makeUrlVaultMetaData()
     {
-        if(this->onFail)
-            this->onFail(error);
+        auto nameSpace=this->setting.nameSpace().isEmpty()
+                             ?""
+                             :"/"+this->setting.nameSpace();
+        auto url=this->setting.url().toString()+nameSpace;
+        auto version=this->setting.version().trimmed().toLower();
+        auto import=this->setting.secretsName().trimmed();
+        import=import.isEmpty()?"":("/"+import);
+
+        static const auto __format=QString("%1/%2/secret/metadata%3");
+        url=__format.arg(url,version,import);
+        return QUrl(url);
+    }
+
+    void emitFail(const QVariantHash &error){
+
         emit this->parent->fail(error);
         if(this->onFinished)
             this->onFinished(*this->parent);
         this->isSuccessful=false;
     }
 
+    void emitFail(const RequestUtil::Response &response)
+    {
+        qCritical()<<response.body();
+        emitFail(response.bodyAsMap());
+    }
+
+    QString getCurrentToken(){
+        if(!this->currentToken.isEmpty())
+            return this->currentToken;
+        return this->setting.token();
+    }
+
     auto makeRequest()
     {
         this->isLoading=true;
-        return &RequestUtil::builder()
+        return &RequestUtil::builder(this)
                     .onStarted([](){})
                     .onFail(
                         [this](RequestUtil::Response response)
                         {
-                            emitFail(response.toMap());
+                            emitFail(response);
                         }
                         )
                     .onFinished(
@@ -154,13 +184,12 @@ public:
                                 this->onFinished(*this->parent);
                             this->isLoading=false;
                         })
-                    .headers(__X_Vault_Token, this->currentToken);
+                    .printOnFail(this->setting.printOnFail())
+                    .headers(__X_Vault_Token, getCurrentToken());
     }
 
     void auth(RequestUtil::VoidMethod callbackSuccess)
     {
-        this->clean();
-
         if(this->isAuthenticated){
             callbackSuccess();
             return;
@@ -214,7 +243,7 @@ public:
                             this->isSuccessful=true;
                         })
                     .GET()
-                    .headers(__X_Vault_Token, this->setting.token())
+                    .headers(__content_type, __application_json)
                     .url(this->makeUrlVaultData())
                     .call();
             });
@@ -222,7 +251,6 @@ public:
 
     void push()
     {
-        this->clean();
         this->isLoading=true;
         this->auth(
             [this]()
@@ -236,9 +264,9 @@ public:
                             this->isSuccessful=true;
                         })
                     .POST()
-                    .headers(__X_Vault_Token, this->setting.token())
+                    .headers(__content_type, __application_json)
                     .url(this->makeUrlVaultData())
-                    .body(this->data)
+                    .body(QVariantHash{{__data,this->data}})
                     .call();
             });
     }
@@ -552,10 +580,38 @@ bool KvClient::isAuthenticated() const
     return p->isAuthenticated;
 }
 
+const KvClient &KvClient::login(const QByteArray &token)
+{
+    p->setting.method(Setting::Token);
+    p->setting.token(token.trimmed());
+    p->currentToken=token.trimmed();
+    emit authorized();
+    return *this;
+}
+
+const KvClient &KvClient::login(const QByteArray &roleId, const QByteArray &secretId)
+{
+    p->setting.method(Setting::AppRole);
+    p->setting.roleId(roleId);
+    p->setting.secretId(secretId);
+    p->auth(
+        [this]()
+        {
+            emit this->authorized();
+        }
+        );
+    return *this;
+}
+
 const KvClient &KvClient::pull() const
 {
     p->pull();
     return *this;
+}
+
+const QVariantHash &KvClient::metaData() const
+{
+    return p->vaultMetaData;
 }
 
 const KvClient &KvClient::push() const
