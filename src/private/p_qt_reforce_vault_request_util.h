@@ -10,7 +10,7 @@
 #include "../qt_reforce_vault_global.h"
 
 namespace QtVault {
-class RequestUtilPvt;
+class RequestClientPvt;
 
 //!
 //! \brief The RequestUtil class
@@ -22,10 +22,10 @@ class Q_REFORCE_VAULT_EXPORT RequestUtil: public QObject
 public:
     struct Response
     {
-        friend class RequestUtilPvt;
+        friend class RequestClientPvt;
         friend class RequestUtil;
     private:
-        explicit Response(RequestUtilPvt *p):p{p}{}
+        explicit Response(RequestClientPvt *p):p{p}{}
     public:
 
         //!
@@ -99,7 +99,7 @@ public:
             return new T(this->body(), parent);
         }
     private:
-        RequestUtilPvt *p=nullptr;
+        RequestClientPvt *p=nullptr;
     };
 
     typedef std::function<void()> VoidMethod;
@@ -358,7 +358,7 @@ private:
     //!
     //! \brief p
     //!
-    RequestUtilPvt *p=nullptr;
+    RequestClientPvt *p=nullptr;
 };
 
 }

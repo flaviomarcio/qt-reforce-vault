@@ -1,5 +1,5 @@
-QTREFORCE_VAULT=true
-DEFINES+=QTREFORCE_VAULT
+QTREFORCE_QVAULT=true
+DEFINES+=QTREFORCE_QVAULT
 
 include($$PWD/src/src.pri)
 QT+=core network

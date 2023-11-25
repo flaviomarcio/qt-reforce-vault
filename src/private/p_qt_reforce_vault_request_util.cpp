@@ -49,7 +49,7 @@ public:
     }
 };
 
-class RequestUtilPvt:public QObject
+class RequestClientPvt:public QObject
 {
 public:
     RequestUtil *parent;
@@ -62,7 +62,7 @@ public:
     ResponsePvt response;
     QNetworkAccessManager qnam;
     QScopedPointer<QNetworkReply, QScopedPointerDeleteLater> replyScope;
-    explicit RequestUtilPvt(RequestUtil *parent):QObject{parent},parent{parent}{
+    explicit RequestClientPvt(RequestUtil *parent):QObject{parent},parent{parent}{
 
     }
 
@@ -171,11 +171,11 @@ public:
             this->httpFinished();
             return;
         }
-        connect(reply, &QNetworkReply::socketStartedConnecting, this, &RequestUtilPvt::httpStarted);
-        connect(reply, &QNetworkReply::requestSent, this, &RequestUtilPvt::httpSent);
-        connect(reply, &QNetworkReply::finished, this, &RequestUtilPvt::httpFinished);
+        connect(reply, &QNetworkReply::socketStartedConnecting, this, &RequestClientPvt::httpStarted);
+        connect(reply, &QNetworkReply::requestSent, this, &RequestClientPvt::httpSent);
+        connect(reply, &QNetworkReply::finished, this, &RequestClientPvt::httpFinished);
 #if QT_CONFIG(ssl)
-        connect(reply, &QNetworkReply::sslErrors, this, &RequestUtilPvt::sslErrors);
+        connect(reply, &QNetworkReply::sslErrors, this, &RequestClientPvt::sslErrors);
 #endif
         if(!this->aSync){
             QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
@@ -299,7 +299,7 @@ const QStringList RequestUtil::Response::bodyAsStringList() const
     return QJsonDocument::fromJson(p->response.body).toVariant().toStringList();
 }
 
-RequestUtil::RequestUtil(QObject *parent):QObject{parent},p{new RequestUtilPvt{this}}
+RequestUtil::RequestUtil(QObject *parent):QObject{parent},p{new RequestClientPvt{this}}
 {
 }
 
