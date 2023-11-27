@@ -73,23 +73,21 @@ QNetworkRequest --> VaultServer(Vault Server)
 >CONFIG += console
 >CONFIG += silent
 >CONFIG -= debug_and_release
->QT += gui core widgets
+>QT += core
 >
 >TEMPLATE = app
 >TARGET = demo
 >
->include($$PWD/../../../qstm/qtvault.pri)
+>include($$PWD/../../../qtvault/qtvault.pri)
 >
 >HEADERS += \
->    $$PWD/personModel.h \
->    $$PWD/personController.h
+>  ...
 >
 >SOURCES += \
->    $$PWD/personController.cpp \
->    $$PWD/main.cpp
+>   $$PWD/main.cpp
 >
 >RESOURCES += \
->    $$PWD/settings.qrc
+>   ...
 >```
 
 ## Implementation method for create connection using connection manager
