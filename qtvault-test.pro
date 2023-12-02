@@ -10,7 +10,7 @@ TEMPLATE = app
 TARGET = QtVaultTests
 
 INCLUDEPATH+=$$PWD/../src
-#INCLUDEPATH+=$$PWD/../src/private
+!QTREFORCE_QREQUEST_CLIENT:include($$PWD/src/private/qrequestclient/src.pri)
 
 qt_reforce_vault_test_MODE=true
 QMAKE_CXXFLAGS += -Dqt_reforce_vault_test_MODE=\\\"$$qt_reforce_vault_test_MODE\\\"

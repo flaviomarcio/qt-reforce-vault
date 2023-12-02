@@ -1,9 +1,9 @@
 #include "./qt_reforce_vault_kv_client.h"
 #include "./qt_reforce_vault_setting.h"
 #ifdef QTREFORCE_QREQUEST_CLIENT
-#include "../../qtrequestclient/src/qt_reforce_request_client.h"
+#include "../../qrequestclient/qt_reforce_request_client.h"
 #else
-#include "./private/p_qt_reforce_request_client.h"
+#include "./private/qrequestclient/qt_reforce_request_client.h"
 #endif
 #include "./private/p_qt_reforce_vault_utils.h"
 #include "./private/p_qt_reforce_vault_logs.h"
@@ -157,8 +157,8 @@ public:
             this->onFinished(*this->parent);
         this->isSuccessful=false;
     }
-
-    void emitFail(const RequestClient::Response &response)
+    
+    void emitFail(const QRequestResponse &response)
     {
         qCritical()<<response.body();
         emitFail(response.bodyAsMap());
@@ -173,16 +173,16 @@ public:
     auto makeRequest()
     {
         this->isLoading=true;
-        return &RequestClient::builder(this)
+        return &QRequestClient::builder(this)
                     .onStarted([](){})
                     .onFail(
-                        [this](RequestClient::Response response)
+                        [this](QRequestResponse response)
                         {
                             emitFail(response);
                         }
                         )
                     .onFinished(
-                        [this](RequestClient *r)
+                        [this](QRequestClient *r)
                         {
                             r->deleteLater();
                             this->isLoading=false;
@@ -191,10 +191,10 @@ public:
                             this->isLoading=false;
                         })
                     .printOnFail(this->setting.printOnFail())
-                    .headers(__X_Vault_Token, getCurrentToken());
+                    .header(__X_Vault_Token, getCurrentToken());
     }
 
-    void auth(RequestClient::VoidMethod callbackSuccess)
+    void auth(QRequestClient::VoidMethod callbackSuccess)
     {
         if(this->isAuthenticated){
             callbackSuccess();
@@ -211,7 +211,7 @@ public:
         auto &req=*makeRequest();
         req
             .onSuccessful(
-                [this, &callbackSuccess](RequestClient::Response response)
+                [this, &callbackSuccess](QRequestResponse response)
                 {
                     auto map=response.bodyAsMap();
                     this->currentToken=map.value(__auth).toHash().value(__client_token).toByteArray().trimmed();
@@ -240,7 +240,7 @@ public:
                 auto &req=*makeRequest();
                 req
                     .onSuccessful(
-                        [this](RequestClient::Response response)
+                        [this](QRequestResponse response)
                         {
                             this->setValues(response.bodyAsMap());
                             if(this->onLoaded)
@@ -249,7 +249,7 @@ public:
                             this->isSuccessful=true;
                         })
                     .GET()
-                    .headers(__content_type, __application_json)
+                    .header(__content_type, __application_json)
                     .url(this->makeUrlVaultData())
                     .call();
             });
@@ -264,13 +264,13 @@ public:
                 auto &req=*makeRequest();
                 req
                     .onSuccessful(
-                        [this](RequestClient::Response response)
+                        [this](QRequestResponse response)
                         {
                             this->vaultMetaData=response.bodyAsMap();
                             this->isSuccessful=true;
                         })
                     .POST()
-                    .headers(__content_type, __application_json)
+                    .header(__content_type, __application_json)
                     .url(this->makeUrlVaultData())
                     .body(QVariantHash{{__data,this->data}})
                     .call();
